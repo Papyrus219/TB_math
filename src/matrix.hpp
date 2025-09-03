@@ -7,97 +7,146 @@
 namespace tbmath
 {
 
-template<typename T ,int Y, int X>
+template<int Y, int X>
 class Matrix
 {
 private:
     class Row
     {
-        T& operator[](int b);
+    public:
+        double& operator[](int b);
 
-        T* row{};
+        ~Row() {if(row) delete[] row;}
 
-        ~Row() {delete row;}
+    private:
+        double* row{};
+        int size_of_row{};
+
+        friend class Matrix;
     };
 
     Row* matrix{};
 
 public:
-    Matrix(std::initializer_list<T> content = {});
+    Matrix(std::initializer_list<double> content = {});
+    Matrix(const Matrix &orginal);
+    Matrix(Matrix &&orginal);
+
     int Size() {return X * Y;};
     int Y_size() {return Y;};
     int X_size() {return X;};
 
     Row& operator[](int a);
 
-    Matrix operator*(int a);
-    Matrix& operator*=(int a);
-    Matrix operator+(Matrix a);
-    Matrix& operator+=(Matrix a);
+    Matrix operator*(double a) const;
+    Matrix& operator*=(double a);
+    Matrix operator+(const Matrix &a) const;
+    Matrix& operator+=(const Matrix &a);
+    Matrix operator-(const Matrix &a) const;
+    Matrix& operator-=(const Matrix &a);
 
-    Matrix<T,X,Y> Transform();
+    template<int M, int N>
+    Matrix<Y,N> operator*(Matrix<M,N> &a);
 
-    ~Matrix() {delete matrix;}
+    Matrix<X,Y> Transform();
+
+    ~Matrix() {if(matrix) delete[] matrix;}
 };
 
-template<typename T, int Y, int X> Matrix<T,Y,X> operator*(Matrix<T,Y,X> a, int b)
+template<int Y, int X>
+Matrix<Y,X> operator*(double b, Matrix<Y,X> a)
 {
     for(int i=0;i<Y;i++)
     {
         for(int j=1;j<=X;j++)
         {
-            a.matrix[i][j] *= a;
+            a.matrix[i][j] *= b;
         }
     }
 
     return a;
 }
 
-template<typename T, int Y, int X> Matrix<T, Y, X>::Matrix(std::initializer_list<T> content)
+template<int Y, int X>
+Matrix<Y,X>::Matrix(const Matrix &orginal)
 {
-    matrix = new Row[Y];
+    this->matrix = new Row[Y];
 
     for(int i=0;i<Y;i++)
-        matrix[i].row = new T[X];
+    {
+        this->matrix[i].row = new double[X];
+        this->matrix[i].size_of_row = X;
+    }
 
-    int i{},j{};
+    for(int i=1;i<=Y;i++)
+    {
+        for(int j=1;j<=X;j++)
+        {
+            *this[i][j] = orginal[i][j];
+        }
+    }
+}
+
+template<int Y, int X>
+Matrix<Y,X>::Matrix(Matrix &&orginal)
+{
+    this->matrix = orginal.matrix;
+
+    orginal.matrix = nullptr;
+}
+
+template<int Y, int X>
+Matrix<Y, X>::Matrix(std::initializer_list<double> content)
+{
+    this->matrix = new Row[Y];
+
+    for(int i=0;i<Y;i++)
+    {
+        this->matrix[i].row = new double[X];
+        this->matrix[i].size_of_row = X;
+    }
+
+    int i{},j{},k{};
     for(auto el : content)
     {
-        matrix[i].row[j] = el;
+        if(k >= Y*X)
+            throw TB_Out_of_range{"Too much value to inicializate!"};
+
+        this->matrix[i].row[j] = el;
 
         j++;
         if(j == X)
         {
             i++;
             j = 0;
-
-            if(i == Y)
-                throw TB_Out_of_range{"Too much value to inicializate!"};
         }
+        k++;
     }
 }
 
-template<typename T, int Y, int X> typename Matrix<T,Y,X>::Row& Matrix<T, Y, X>::operator[](int a)
+template<int Y, int X> typename Matrix<Y,X>::Row& Matrix<Y, X>::operator[](int a)
 {
     if(a < 1)
         throw TB_Out_of_range{"The first [] value is too low!"};
-    else if(a >= Y)
+    else if(a > Y)
         throw TB_Out_of_range{"The first [] value is too high!"};
 
     return matrix[a-1];
 }
 
-template<typename T, int Y, int X> T & Matrix<T, Y, X>::Row::operator[](int b)
+template<int Y, int X>
+double& Matrix<Y, X>::Row::operator[](int b)
 {
     if(b < 1)
         throw TB_Out_of_range{"The second [] value is too low!"};
-    else if(b >= X)
+    else if(b > X)
         throw TB_Out_of_range{"The second [] value is too high!"};
 
     return row[b-1];
 }
 
-template<typename T, int Y, int X> Matrix<T, Y, X> Matrix<T, Y, X>::operator*(int a)
+template<int Y, int X>
+Matrix<Y, X> Matrix<Y, X>::operator*(double a) const
 {
     Matrix result = *this;
 
@@ -112,27 +161,29 @@ template<typename T, int Y, int X> Matrix<T, Y, X> Matrix<T, Y, X>::operator*(in
     return result;
 }
 
-template<typename T, int Y, int X> Matrix<T,Y,X>& Matrix<T,Y,X>::operator*=(int a)
+template<int Y, int X>
+Matrix<Y,X>& Matrix<Y,X>::operator*=(double a)
 {
     for(int i=1;i<=Y;i++)
     {
         for(int j=1;j<=X;j++)
         {
-            this[i][j] *= a;
+            (*this)[i][j] *= a;
         }
     }
 
     return *this;
 }
 
-template<typename T, int Y, int X> Matrix<T,Y,X> Matrix<T,Y,X>::operator+(Matrix a)
+template<int Y, int X>
+Matrix<Y,X> Matrix<Y,X>::operator+(const Matrix &a) const
 {
     if(this->Y_size() != a.Y_size())
         throw TB_Dont_compatible{"Number of lines dont match!"};
     if(this->X_size() != a.X_size())
         throw TB_Dont_compatible{"Number of columns dont match!"};
 
-    Matrix result = a;
+    Matrix result = *this;
 
     for(int i=1;i<=Y;i++)
     {
@@ -145,7 +196,8 @@ template<typename T, int Y, int X> Matrix<T,Y,X> Matrix<T,Y,X>::operator+(Matrix
     return result;
 }
 
-template<typename T, int Y, int X> Matrix<T,Y,X>& Matrix<T,Y,X>::operator+=(Matrix a)
+template<int Y, int X>
+Matrix<Y,X>& Matrix<Y,X>::operator+=(const Matrix &a)
 {
     if(this->Y_size() != a.Y_size())
         throw TB_Dont_compatible{"Number of lines dont match!"};
@@ -163,9 +215,73 @@ template<typename T, int Y, int X> Matrix<T,Y,X>& Matrix<T,Y,X>::operator+=(Matr
     return *this;
 }
 
-template<typename T, int Y, int X> Matrix<T,X,Y> Matrix<T,Y,X>::Transform()
+template<int Y, int X>
+Matrix<Y,X> Matrix<Y,X>::operator-(const Matrix &a) const
 {
-    Matrix<T,X,Y> result;
+    if(this->Y_size() != a.Y_size())
+        throw TB_Dont_compatible{"Number of lines dont match!"};
+    if(this->X_size() != a.X_size())
+        throw TB_Dont_compatible{"Number of columns dont match!"};
+
+    Matrix result = *this;
+
+    for(int i=1;i<=Y;i++)
+    {
+        for(int j=1;j<=X;j++)
+        {
+            result[i][j] += a[i][j];
+        }
+    }
+
+    return result;
+}
+
+template<int Y, int X>
+Matrix<Y,X>& Matrix<Y,X>::operator-=(const Matrix &a)
+{
+    if(this->Y_size() != a.Y_size())
+        throw TB_Dont_compatible{"Number of lines dont match!"};
+    if(this->X_size() != a.X_size())
+        throw TB_Dont_compatible{"Number of columns dont match!"};
+
+    for(int i=1;i<=Y;i++)
+    {
+        for(int j=1;j<=X;j++)
+        {
+            *this[i][j] -= a[i][j];
+        }
+    }
+
+    return *this;
+}
+
+template<int Y, int X>
+template<int M, int N>
+Matrix<Y,N> Matrix<Y,X>::operator*(Matrix<M,N> &a)
+{
+    if(X != M)
+        throw TB_Dont_compatible{"Number of lines don't match number of columns!"};
+
+    Matrix<Y,N> result{};
+
+    for(int i=1;i<Y;i++)
+    {
+        for(int j=1;j<=N;j++)
+        {
+            for(int k=1;k<=X;k++)
+            {
+                result[i][j] += ( ((*this)[i])[k] * (a[k])[j] );
+            }
+        }
+    }
+
+    return result;
+}
+
+template<int Y, int X>
+Matrix<X,Y> Matrix<Y,X>::Transform()
+{
+    Matrix<X,Y> result;
 
     for(int i=1;i<=Y;i++)
     {
